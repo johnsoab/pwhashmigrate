@@ -12,21 +12,25 @@ def checkpw(username, password):
     First attempt, simply bcrypt.checkpw(password) for the user
     If fails, perhaps it's an upgraded hash, so instead, bcrypt.checkpw(sha1(password))
     """
-    user = c.execute("SELECT username,password FROM AppUsers WHERE username = ? LIMIT 1", (username,)).fetchone()
-    if (len(user) > 0):
-        if (bcrypt.checkpw(password.encode('UTF-8'), (user[1].encode('UTF-8')))):
-             print("Successfully logged in as", username, "using new scheme")
-             return 0
-        else:
-             # If we failed the password check natively, now sha1 the original password. Linters/SAST may complain about using sha1, but under this context, it is safe: we're not storing it this way, it's to support legacy lookup. 
-             sha1pw = (hashlib.sha1(password.encode('UTF-8')).hexdigest()).encode('UTF-8')
-             if (bcrypt.checkpw(sha1pw, user[1].encode('UTF-8'))):
-                 print("Successfully logged in as", username ,"using old scheme")
-                 # Consider updating the hash here if user passwords never expire, since you now have the real users password, and it's been verified.
-                 # This will drop the sha1 secondary lookup from recurring.
+    try:
+        user = c.execute("SELECT username,password FROM AppUsers WHERE username = ? LIMIT 1", (username,)).fetchone()
+        if (len(user) > 0):
+            if (bcrypt.checkpw(password.encode('UTF-8'), (user[1].encode('UTF-8')))):
+                 print("Successfully logged in as", username, "using new scheme")
                  return 0
-    # our final fall thru is reject
-    print("Failed username or password for ", username)
+            else:
+                 # If we failed the password check natively, now sha1 the original password. Linters/SAST may complain about using sha1, but under this context, it is safe: we're not storing it this way, it's to support legacy lookup. 
+                 sha1pw = (hashlib.sha1(password.encode('UTF-8')).hexdigest()).encode('UTF-8')
+                 if (bcrypt.checkpw(sha1pw, user[1].encode('UTF-8'))):
+                     print("Successfully logged in as", username ,"using old scheme")
+                     # Consider updating the hash here if user passwords never expire, since you now have the real users password, and it's been verified.
+                     # This will drop the sha1 secondary lookup from recurring.
+                     return 0
+        # our final fall thru is reject
+        print("Failed username or password for ", username)
+        return 1
+    except:
+        print("Something failed.. Most likely you did not upgrade your DB yet. This test harness only works post-upgrade.")
     return 1
 
 
